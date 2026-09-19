@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BookOpen, HelpCircle, Wrench, Upload, Search, Trash2, Eye, CheckCircle2, Loader2, BarChart2, MessageCircle, Send, X, Bell } from 'lucide-react';
+import { BookOpen, HelpCircle, Wrench, Upload, Search, Trash2, Eye, CheckCircle2, Loader2, BarChart2, MessageCircle, Send, X, Bell, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getConversations, getStoredDocuments, askStoredDocument, deleteStoredDocument, getDocumentDownloadUrl, saveConversation } from '../lib/api';
 
@@ -21,6 +21,7 @@ function ExpandableAnswer({ answer, className = '' }) {
 }
 
 export default function LibraryPage() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 1024);
   const [search, setSearch] = useState('');
   const { state } = useLocation();
   const { user } = useAuth();
@@ -74,6 +75,14 @@ export default function LibraryPage() {
   }, [notice]);
 
   const filteredDocs = documents.filter(doc => doc.title.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setIsSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleDelete = async (document) => {
     if (document.storageId) {
@@ -137,12 +146,18 @@ export default function LibraryPage() {
         </div>
       )}
       {/* Sidebar Navigation */}
-      <aside className="library-sidebar w-64 bg-[#0A1626] border-r border-cyan-950/60 p-5 flex flex-col justify-between hidden md:flex">
+      {isSidebarOpen && <button type="button" className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setIsSidebarOpen(false)} aria-label="Close sidebar" />}
+      <aside className={`library-sidebar w-64 shrink-0 bg-[#0A1626] border-r border-cyan-950/60 p-5 flex flex-col justify-between transition-[transform,margin] duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0 lg:ml-0' : '-translate-x-full lg:-ml-64'} lg:relative lg:z-auto max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-50`}>
         <div className="space-y-6">
-          <Link to="/" className="text-xl font-bold tracking-wider text-brand-accent block">
-            2nd <span className="text-white">BR@IN</span>
-            <span className="text-[10px] block text-gray-400 font-normal">AI Study Assistant</span>
-          </Link>
+          <div className="flex items-start justify-between gap-2">
+            <Link to="/" className="text-xl font-bold tracking-wider text-brand-accent block">
+              2nd <span className="text-white">BR@IN</span>
+              <span className="text-[10px] block text-gray-400 font-normal">AI Study Assistant</span>
+            </Link>
+            <button type="button" onClick={() => setIsSidebarOpen(false)} className="hidden lg:block p-1 text-gray-400 hover:text-white" title="Close sidebar" aria-label="Close sidebar">
+              <PanelLeftClose className="w-5 h-5" />
+            </button>
+          </div>
 
           <Link
             to="/upload"
@@ -168,7 +183,7 @@ export default function LibraryPage() {
 
           {/* Recent Uploads Widget */}
           <div className="space-y-2 pt-4 border-t border-cyan-950/40">
-            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold px-2">Recent Uploads</span>
+            <span className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold px-2">Your History</span>
             <div className="space-y-2">
               {documents.slice(0, 2).map((document) => (
                 <button
@@ -189,12 +204,17 @@ export default function LibraryPage() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 md:p-8 overflow-y-auto space-y-6">
+      <main className="min-w-0 flex-1 p-6 md:p-8 overflow-y-auto space-y-6 transition-[width] duration-300 ease-in-out">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-brand-accent">My Library</h1>
-            <p className="text-xs text-gray-400">All your notes, PDFs, and files. Explained when you need them.</p>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setIsSidebarOpen((current) => !current)} className="p-2 rounded-lg bg-[#122438] text-cyan-300 hover:text-white transition" title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'} aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}>
+              {isSidebarOpen ? <Menu className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold text-brand-accent">My Library</h1>
+              <p className="text-xs text-gray-400">All your notes, PDFs, and files. Explained when you need them.</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">

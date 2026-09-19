@@ -98,8 +98,12 @@ export async function deleteStoredDocument(documentId, ownerEmail) {
 }
 
 export async function askAboutDocument(file, question) {
+  return askAboutDocuments([file], question);
+}
+
+export async function askAboutDocuments(files, question) {
   const formData = new FormData();
-  formData.append('file', file);
+  files.forEach((file) => formData.append('files', file));
   formData.append('question', question);
 
   const response = await fetch(`${API_BASE_URL}/rag_3`, {

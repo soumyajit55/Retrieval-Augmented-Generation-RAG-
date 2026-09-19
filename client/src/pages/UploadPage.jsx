@@ -1,46 +1,51 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UploadCloud, FileText, CheckCircle2, X, Plus, BrainCircuit, Send, Image, Pencil, Globe } from 'lucide-react';
-import { askStoredDocument, saveConversation, storeDocument } from '../lib/api';
+import { askAboutDocuments, askStoredDocument, saveConversation, storeDocument } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 export default function UploadPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [question, setQuestion] = useState('');
 
-  const handleFileSelection = (file) => {
-    if (!file) return;
-
-    if (file.size > 20 * 1024 * 1024) {
-      setSelectedFile(null);
-      setUploadError('That file is larger than the 20 MB limit. Please choose a smaller file.');
+  const handleFileSelection = (files) => {
+    const validFiles = Array.from(files || []);
+    const oversizedFile = validFiles.find((file) => file.size > 20 * 1024 * 1024);
+    if (oversizedFile) {
+      setUploadError(`${oversizedFile.name} is larger than the 20 MB limit.`);
       return;
     }
 
-    setSelectedFile({
-      file,
-      name: file.name,
-      size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+    setSelectedFiles((currentFiles) => {
+      const existingNames = new Set(currentFiles.map((item) => item.name));
+      const newFiles = validFiles
+        .filter((file) => !existingNames.has(file.name))
+        .map((file) => ({
+          file,
+          name: file.name,
+          size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        }));
+      return [...currentFiles, ...newFiles];
     });
     setUploadError('');
   };
 
   const handleFileInput = (event) => {
-    handleFileSelection(event.target.files[0]);
+    handleFileSelection(event.target.files);
     event.target.value = '';
   };
 
   const handleDrop = (event) => {
     event.preventDefault();
-    handleFileSelection(event.dataTransfer.files[0]);
+    handleFileSelection(event.dataTransfer.files);
   };
 
   const handleUploadSubmit = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       setUploadError('Choose a file before asking a question.');
       return;
     }
@@ -54,18 +59,28 @@ export default function UploadPage() {
     setUploadError('');
 
     try {
-      const storedDocument = await storeDocument(selectedFile.file, user.email);
-      const result = await askStoredDocument(storedDocument.id, user.email, question.trim());
-      await saveConversation({
+      const storedDocuments = await Promise.all(
+        selectedFiles.map((selectedFile) => storeDocument(selectedFile.file, user.email)),
+      );
+      const result = selectedFiles.length === 1
+        ? await askStoredDocument(storedDocuments[0].id, user.email, question.trim())
+        : await askAboutDocuments(selectedFiles.map((selectedFile) => selectedFile.file), question.trim());
+
+      await Promise.all(storedDocuments.map((storedDocument, index) => saveConversation({
         owner_email: user.email,
         document_id: storedDocument.id,
-        fileName: selectedFile.name,
+        fileName: selectedFiles[index].name,
         question: question.trim(),
         answer: result.answer,
         citations: result.citations || [],
-      });
+      })));
       setIsProcessing(false);
-      navigate('/library', { state: { result, fileName: selectedFile.name } });
+      navigate('/library', {
+        state: {
+          result,
+          fileName: selectedFiles.map((selectedFile) => selectedFile.name).join(', '),
+        },
+      });
     } catch (error) {
       setIsProcessing(false);
       setUploadError(error.message || 'Unable to connect to the RAG backend.');
@@ -126,21 +141,29 @@ export default function UploadPage() {
         {uploadError && <p className="upload-error">{uploadError}</p>}
 
         {/* Uploaded File Pill */}
-        {selectedFile && (
-          <div className="upload-file-chip">
-            <div className="flex items-center gap-3">
-              <FileText className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="text-xs font-bold">{selectedFile.name}</p>
-                <p className="text-[10px] text-gray-500">{selectedFile.size}</p>
+        {selectedFiles.length > 0 && (
+          <div className="space-y-2">
+            {selectedFiles.map((selectedFile) => (
+              <div key={selectedFile.name} className="upload-file-chip">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileText className="w-6 h-6 text-green-600 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold truncate">{selectedFile.name}</p>
+                    <p className="text-[10px] text-gray-500">{selectedFile.size}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <button
+                    onClick={() => setSelectedFiles((currentFiles) => currentFiles.filter((item) => item.name !== selectedFile.name))}
+                    className="text-gray-400 hover:text-red-500"
+                    aria-label={`Remove ${selectedFile.name}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <button onClick={() => setSelectedFile(null)} className="text-gray-400 hover:text-red-500">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
           </div>
         )}
 

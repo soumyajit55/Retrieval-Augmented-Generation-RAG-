@@ -1,5 +1,6 @@
 from google import genai          #type:ignore
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Query       #type:ignore
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore
 import pymupdf                    # type: ignore
 import numpy as np                #type:ignore
 import os
@@ -18,6 +19,19 @@ load_dotenv()
 
 app = FastAPI()
 
+allowed_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "*").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 client = genai.Client(
     api_key=os.getenv("gemini-api-key")
 )
@@ -32,6 +46,15 @@ print("MongoDB connection initialized!")
 
 db = client_2["RAG_db"]
 Users = db["Users"]                          # collection name where user data is stored
+
+
+@app.get("/")
+def root_check():
+    return {
+        "status": "ok",
+        "service": "rag_backend",
+        "message": "RAG backend is running. Use /health for diagnostics.",
+    }
 
 
 @app.post("/register")

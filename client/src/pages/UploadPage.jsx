@@ -1,16 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, FileText, CheckCircle2, X, Plus, BrainCircuit, Send, Image, Pencil, Globe } from 'lucide-react';
-import { askAboutDocuments, askStoredDocument, saveConversation, storeDocument } from '../lib/api';
+import { UploadCloud, FileText, CheckCircle2, X, Plus, BrainCircuit, Send, Image, Pencil, Globe, Menu, PanelLeftOpen } from 'lucide-react';
+import { askAboutDocuments, askStoredDocument, getStoredDocuments, saveConversation, storeDocument } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import LibrarySidebar from '../components/LibrarySidebar';
 
 export default function UploadPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window === 'undefined' || window.innerWidth >= 1024);
+  const [documents, setDocuments] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [question, setQuestion] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    getStoredDocuments(user.email)
+      .then((storedDocuments) => {
+        if (isMounted) setDocuments(storedDocuments.map((document) => ({ ...document, title: document.name })));
+      })
+      .catch(() => {});
+
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setIsSidebarOpen(true);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [user.email]);
 
   const handleFileSelection = (files) => {
     const validFiles = Array.from(files || []);
@@ -88,8 +109,20 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="upload-page min-h-screen bg-[#07111E] text-white flex flex-col items-center px-4">
-      <main className="upload-workspace w-full max-w-3xl">
+    <div className="upload-page min-h-screen bg-[#07111E] text-white flex">
+      <LibrarySidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        documents={documents}
+        activePage="upload"
+        onRecentUpload={() => navigate('/library')}
+      />
+      <main className="upload-workspace min-w-0 flex-1 w-full max-w-3xl mx-auto px-4 transition-[width] duration-300 ease-in-out">
+        <div className="flex items-center gap-3 mb-4">
+          <button type="button" onClick={() => setIsSidebarOpen((current) => !current)} className="p-2 rounded-lg bg-[#122438] text-cyan-300 hover:text-white transition" title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'} aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}>
+            {isSidebarOpen ? <Menu className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+          </button>
+        </div>
         <div className="upload-welcome text-center">
           <div className="upload-welcome-icon"><BrainCircuit className="w-5 h-5" /></div>
           <h1 className="text-3xl font-semibold tracking-tight">Ready when you are.</h1>

@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+google-genai
+pymupdf
+python-docx
+python-dotenv
+numpy
+Pillow
+bcrypt
+pymongo
